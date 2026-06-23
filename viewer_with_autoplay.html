@@ -13,13 +13,136 @@ html,body,#lessonViewer{width:100%;height:100%;margin:0;border:0;display:block;b
 <iframe id="lessonViewer" src="hs_thinking_basic_library_viewer_v5_spacing_fix.html" title="THINKING BASIC 학생 전용 뷰어" allow="autoplay; fullscreen" allowfullscreen></iframe>
 <script>
 const lessonViewer = document.getElementById('lessonViewer');
+const textbookParts = Array.from({ length: 8 }, (_, index) => `book_parts/${String(index).padStart(2, '0')}.txt`);
+const lessonPageMap = { u1c: '1', u1e: '5', u2c: '12', u2e: '18', u3c: '25', u3e: '30' };
+const bookVersion = 'thinking-basic-book-a7d13d47';
+let textbookHtmlPromise;
+
+function loadTextbookHtml() {
+  if (textbookHtmlPromise) return textbookHtmlPromise;
+  textbookHtmlPromise = Promise.all(textbookParts.map(async (path) => {
+    const response = await fetch(`${path}?v=${bookVersion}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`교재 파일을 불러오지 못했습니다: ${path}`);
+    return (await response.text()).trim();
+  })).then(async (parts) => {
+    const binary = atob(parts.join(''));
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    if (!('DecompressionStream' in window)) {
+      throw new Error('교재 압축 해제를 지원하지 않는 브라우저입니다. Chrome 또는 Edge 최신 버전을 사용해 주세요.');
+    }
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(stream).text();
+  });
+  return textbookHtmlPromise;
+}
+
+function addUpdatedBookStyle(lessonDocument, parsedBook) {
+  const previous = lessonDocument.getElementById('updatedBookSourceStyle');
+  if (previous) previous.remove();
+  let css = Array.from(parsedBook.head.querySelectorAll('style')).map((style) => style.textContent).join('\n');
+  css = css.replace(/(^|})\s*body\s*\{[^}]*\}/g, '$1');
+  const style = lessonDocument.createElement('style');
+  style.id = 'updatedBookSourceStyle';
+  style.textContent = css;
+  lessonDocument.head.appendChild(style);
+}
+
+function addWatermark(lessonDocument, page, studentName) {
+  const watermark = lessonDocument.createElement('div');
+  watermark.className = 'student-watermark';
+  const text = `G!FIELD · ${studentName}`;
+
+  const main = lessonDocument.createElement('span');
+  main.className = 'wm-main';
+  main.textContent = text;
+  watermark.appendChild(main);
+
+  ['wm-r1', 'wm-r2', 'wm-r3'].forEach((className) => {
+    const row = lessonDocument.createElement('span');
+    row.className = `wm-print-row ${className}`;
+    row.textContent = text;
+    watermark.appendChild(row);
+  });
+  page.insertBefore(watermark, page.firstChild);
+}
+
+function setBookPageData(pages) {
+  pages.forEach((page, index) => {
+    const footer = page.querySelector('.footer-page-num');
+    const label = footer ? footer.textContent.trim() : '';
+    const match = label.match(/^-\s*(\d+)\s*-$/);
+    page.dataset.bookPage = match ? match[1] : (index === 0 ? 'cover' : '');
+  });
+}
+
+function fitBookPages(lessonDocument, pane) {
+  const available = Math.max(320, pane.clientWidth - 34);
+  const scale = Math.max(0.42, Math.min(0.92, available / 794));
+  lessonDocument.documentElement.style.setProperty('--book-zoom', scale.toFixed(3));
+}
+
+function scrollToMappedLesson(lessonDocument) {
+  const activeButton = lessonDocument.querySelector('.lesson-button[data-lesson].active');
+  const pageNumber = activeButton ? lessonPageMap[activeButton.dataset.lesson] : null;
+  const pane = lessonDocument.getElementById('bookPane');
+  if (!pane || !pageNumber) return;
+  const page = Array.from(pane.querySelectorAll('.page')).find((element) => element.dataset.bookPage === pageNumber);
+  if (page) pane.scrollTo({ top: Math.max(0, page.offsetTop - 14), behavior: 'smooth' });
+}
+
+async function replaceBookContent(lessonDocument) {
+  const pane = lessonDocument.getElementById('bookPane');
+  if (!pane || pane.dataset.bookVersion === bookVersion || pane.dataset.bookVersion === 'loading') return;
+  pane.dataset.bookVersion = 'loading';
+
+  try {
+    const source = await loadTextbookHtml();
+    const parsedBook = new DOMParser().parseFromString(source, 'text/html');
+    const pages = Array.from(parsedBook.body.children)
+      .filter((element) => element.classList && element.classList.contains('page'))
+      .map((element) => lessonDocument.importNode(element, true));
+    if (!pages.length) throw new Error('교재 페이지를 찾지 못했습니다.');
+
+    addUpdatedBookStyle(lessonDocument, parsedBook);
+    setBookPageData(pages);
+    const studentName = lessonDocument.defaultView.sessionStorage.getItem('gfield_thinking_basic_student') || '학생';
+    pages.forEach((page) => addWatermark(lessonDocument, page, studentName));
+    pane.replaceChildren(...pages);
+    pane.dataset.bookVersion = bookVersion;
+    fitBookPages(lessonDocument, pane);
+    requestAnimationFrame(() => scrollToMappedLesson(lessonDocument));
+  } catch (error) {
+    pane.dataset.bookVersion = '';
+    console.error(error);
+  }
+}
+
+function watchForBookLoad(lessonDocument) {
+  const waitForPane = () => {
+    const pane = lessonDocument.getElementById('bookPane');
+    if (!pane) {
+      setTimeout(waitForPane, 60);
+      return;
+    }
+    const replaceWhenReady = () => {
+      if (pane.dataset.bookVersion || !pane.querySelector('.page')) return;
+      setTimeout(() => replaceBookContent(lessonDocument), 0);
+    };
+    new MutationObserver(replaceWhenReady).observe(pane, { childList: true });
+    replaceWhenReady();
+  };
+  waitForPane();
+}
+
 lessonViewer.addEventListener('load', () => {
   const lessonDocument = lessonViewer.contentDocument;
-  if (!lessonDocument || lessonDocument.documentElement.dataset.lessonAutoplayBound) return;
-  lessonDocument.documentElement.dataset.lessonAutoplayBound = 'true';
+  if (!lessonDocument || lessonDocument.documentElement.dataset.viewerExtensionsBound) return;
+  lessonDocument.documentElement.dataset.viewerExtensionsBound = 'true';
+  watchForBookLoad(lessonDocument);
 
   lessonDocument.addEventListener('click', (event) => {
-    if (!event.target.closest('button[data-lesson]')) return;
+    const lessonButton = event.target.closest('button[data-lesson]');
+    if (!lessonButton) return;
 
     queueMicrotask(() => {
       const videoFrame = lessonDocument.getElementById('lessonVideoFrame');
@@ -29,6 +152,8 @@ lessonViewer.addEventListener('load', () => {
       videoUrl.searchParams.set('playsinline', '1');
       videoFrame.src = videoUrl.toString();
     });
+
+    setTimeout(() => scrollToMappedLesson(lessonDocument), 240);
   });
 });
 </script>
