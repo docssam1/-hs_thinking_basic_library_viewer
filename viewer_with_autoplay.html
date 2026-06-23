@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>G-FIELD THINKING BASIC 학생 전용 뷰어</title>
+<style>
+html,body,#lessonViewer{width:100%;height:100%;margin:0;border:0;display:block;background:#eef3f8}
+#lessonViewer{min-height:100dvh}
+</style>
+</head>
+<body>
+<iframe id="lessonViewer" src="hs_thinking_basic_library_viewer_v5_spacing_fix.html" title="THINKING BASIC 학생 전용 뷰어" allow="autoplay; fullscreen" allowfullscreen></iframe>
+<script>
+const lessonViewer = document.getElementById('lessonViewer');
+lessonViewer.addEventListener('load', () => {
+  const lessonDocument = lessonViewer.contentDocument;
+  if (!lessonDocument || lessonDocument.documentElement.dataset.lessonAutoplayBound) return;
+  lessonDocument.documentElement.dataset.lessonAutoplayBound = 'true';
+
+  lessonDocument.addEventListener('click', (event) => {
+    if (!event.target.closest('button[data-lesson]')) return;
+
+    queueMicrotask(() => {
+      const videoFrame = lessonDocument.getElementById('lessonVideoFrame');
+      if (!videoFrame || !videoFrame.src) return;
+      const videoUrl = new URL(videoFrame.src);
+      videoUrl.searchParams.set('autoplay', '1');
+      videoUrl.searchParams.set('playsinline', '1');
+      videoFrame.src = videoUrl.toString();
+    });
+  });
+});
+</script>
+</body>
+</html>
