@@ -81,6 +81,12 @@ function fitBookPages(lessonDocument, pane) {
   lessonDocument.documentElement.style.setProperty('--book-zoom', scale.toFixed(3));
 }
 
+function syncLessonPageLabel(lessonDocument, lessonKey) {
+  const pageNumber = lessonPageMap[lessonKey];
+  const meta = lessonDocument.getElementById('videoPanelMeta');
+  if (pageNumber && meta) meta.textContent = `교재 ${pageNumber}쪽으로 자동 이동`;
+}
+
 function scrollToMappedLesson(lessonDocument) {
   const activeButton = lessonDocument.querySelector('.lesson-button[data-lesson].active');
   const pageNumber = activeButton ? lessonPageMap[activeButton.dataset.lesson] : null;
@@ -143,6 +149,7 @@ lessonViewer.addEventListener('load', () => {
   lessonDocument.addEventListener('click', (event) => {
     const lessonButton = event.target.closest('button[data-lesson]');
     if (!lessonButton) return;
+    syncLessonPageLabel(lessonDocument, lessonButton.dataset.lesson);
 
     queueMicrotask(() => {
       const videoFrame = lessonDocument.getElementById('lessonVideoFrame');
