@@ -7,6 +7,41 @@
 <style>
 html,body,#lessonViewer{width:100%;height:100%;margin:0;border:0;display:block;background:#eef3f8}
 #lessonViewer{min-height:100dvh}
+/* ===== 관리자(독선생) 모드 ===== */
+#gfAdminOverlay{position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;background:rgba(8,18,38,.62);backdrop-filter:blur(6px);font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif}
+#gfAdminOverlay.show{display:flex}
+#gfAdminOverlay *{box-sizing:border-box}
+.gf-admin-card{width:min(560px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.4);position:relative}
+.gf-admin-card:before{content:"";position:absolute;inset:0 0 auto;height:8px;background:linear-gradient(90deg,#16417C,#7c3aed,#e11d48,#f59e0b)}
+.gf-admin-inner{padding:26px 24px 22px}
+.gf-admin-kicker{font-size:11px;font-weight:900;letter-spacing:2.5px;color:#d97706}
+.gf-admin-title{margin:6px 0 4px;font-size:21px;font-weight:900;color:#111827;letter-spacing:-.5px}
+.gf-admin-desc{margin:0 0 16px;font-size:13px;line-height:1.6;color:#526071;word-break:keep-all}
+.gf-admin-label{display:block;font-size:12.5px;font-weight:800;color:#16417C;margin:14px 0 6px}
+.gf-admin-input,.gf-admin-textarea{width:100%;border:2px solid #d7dee9;border-radius:13px;padding:12px 13px;font-size:15px;font-weight:700;outline:none;background:#fff;color:#0f172a}
+.gf-admin-input:focus,.gf-admin-textarea:focus{border-color:#16417C;box-shadow:0 0 0 4px rgba(22,65,124,.1)}
+.gf-admin-textarea{min-height:150px;resize:vertical;line-height:1.7;font-family:inherit}
+.gf-admin-btn{height:48px;width:100%;border:0;border-radius:13px;cursor:pointer;font-size:15px;font-weight:900;color:#fff;background:linear-gradient(135deg,#16417C,#2a3ca6 58%,#7c3aed);box-shadow:0 10px 24px rgba(22,65,124,.25)}
+.gf-admin-btn.secondary{background:#f1f5f9;color:#16417C;box-shadow:none;border:1px solid #d7dee9}
+.gf-admin-btn.ghost{background:transparent;color:#64748b;box-shadow:none;height:40px;font-size:13px}
+.gf-admin-btn+.gf-admin-btn{margin-top:9px}
+.gf-admin-row{display:flex;gap:9px;margin-top:9px}
+.gf-admin-row .gf-admin-btn{margin-top:0}
+.gf-admin-status{min-height:20px;margin-top:12px;font-size:13px;font-weight:800;line-height:1.5;word-break:keep-all}
+.gf-admin-status.ok{color:#16a34a}
+.gf-admin-status.err{color:#dc2626}
+.gf-admin-status.busy{color:#16417C}
+.gf-admin-modes{display:flex;gap:8px;margin:4px 0 2px}
+.gf-admin-mode{flex:1;border:2px solid #d7dee9;border-radius:12px;padding:10px;cursor:pointer;font-size:12.5px;font-weight:800;color:#334155;text-align:center;line-height:1.4}
+.gf-admin-mode.active{border-color:#16417C;background:#eef3fb;color:#16417C}
+.gf-admin-check{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px;font-weight:700;color:#475569}
+.gf-admin-check input{width:18px;height:18px}
+.gf-admin-code{width:100%;min-height:90px;border:1px solid #cbd5e1;border-radius:11px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.5;background:#0f172a;color:#a7f3d0;margin-top:10px;display:none;white-space:pre-wrap;word-break:break-all}
+.gf-admin-help{margin-top:14px;font-size:12px;color:#64748b;line-height:1.6}
+.gf-admin-help summary{cursor:pointer;font-weight:800;color:#16417C}
+.gf-admin-help ol{margin:8px 0 0;padding-left:18px}
+.gf-admin-help li{margin-bottom:5px}
+.gf-admin-note{margin-top:10px;font-size:11.5px;color:#94a3b8;line-height:1.5}
 </style>
 </head>
 <body>
@@ -163,6 +198,298 @@ lessonViewer.addEventListener('load', () => {
     setTimeout(() => scrollToMappedLesson(lessonDocument), 240);
   });
 });
+</script>
+
+<!-- ============================================================
+     관리자(독선생) 모드 — 명단 관리
+     로그인 화면에서 "독선생" 입력 후 입장하면 비밀번호를 묻고,
+     맞으면 명단을 추가/교체하여 GitHub에 바로 반영할 수 있습니다.
+     ============================================================ -->
+<div id="gfAdminOverlay">
+  <div class="gf-admin-card">
+    <div class="gf-admin-inner">
+      <div class="gf-admin-kicker">G-FIELD ADMIN</div>
+      <!-- 1단계: 비밀번호 -->
+      <div id="gfAdminLock">
+        <div class="gf-admin-title">관리자 인증</div>
+        <p class="gf-admin-desc">독선생 전용 화면입니다. 관리자 비밀번호를 입력해 주세요.</p>
+        <label class="gf-admin-label" for="gfAdminPass">관리자 비밀번호</label>
+        <input id="gfAdminPass" class="gf-admin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호 입력">
+        <div style="height:12px"></div>
+        <button class="gf-admin-btn" type="button" id="gfAdminUnlockBtn">관리자 모드 입장</button>
+        <button class="gf-admin-btn ghost" type="button" id="gfAdminLockClose">닫기</button>
+        <div id="gfAdminLockStatus" class="gf-admin-status err"></div>
+      </div>
+
+      <!-- 2단계: 명단 관리 패널 -->
+      <div id="gfAdminPanel" style="display:none">
+        <div class="gf-admin-title">명단 관리</div>
+        <p class="gf-admin-desc">학생 이름을 한 줄에 한 명씩 입력하세요. 저장하면 모든 학생 기기에 적용됩니다. (반영까지 최대 1~2분, 학생은 새로고침 필요)</p>
+
+        <div class="gf-admin-modes">
+          <div class="gf-admin-mode active" data-mode="add">기존 명단 유지<br>+ 추가</div>
+          <div class="gf-admin-mode" data-mode="replace">입력한 명단으로<br>전체 교체</div>
+        </div>
+
+        <label class="gf-admin-label" id="gfRosterLabel" for="gfAdminRoster">추가할 학생 이름 (한 줄에 한 명)</label>
+        <textarea id="gfAdminRoster" class="gf-admin-textarea" placeholder="홍길동&#10;김철수&#10;이영희"></textarea>
+
+        <label class="gf-admin-label" for="gfAdminToken">GitHub 토큰 (Contents 쓰기 권한)</label>
+        <input id="gfAdminToken" class="gf-admin-input" type="password" autocomplete="off" placeholder="github_pat_... 또는 ghp_...">
+        <label class="gf-admin-check"><input type="checkbox" id="gfAdminRemember" checked> 이 기기에 토큰·명단 기억 (공용 PC면 해제)</label>
+
+        <div style="height:14px"></div>
+        <button class="gf-admin-btn" type="button" id="gfAdminSaveBtn">GitHub에 저장 (모든 학생 적용)</button>
+        <div class="gf-admin-row">
+          <button class="gf-admin-btn secondary" type="button" id="gfAdminCopyBtn">코드만 복사</button>
+          <button class="gf-admin-btn secondary" type="button" id="gfAdminCloseBtn">닫기</button>
+        </div>
+        <div id="gfAdminStatus" class="gf-admin-status"></div>
+        <textarea id="gfAdminCode" class="gf-admin-code" readonly></textarea>
+
+        <details class="gf-admin-help">
+          <summary>GitHub 토큰 만드는 법 / 토큰 없이 저장하기</summary>
+          <ol>
+            <li>GitHub 로그인 → 우측 상단 프로필 → <b>Settings</b></li>
+            <li>맨 아래 <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → <b>Generate new token</b></li>
+            <li><b>Repository access</b>에서 <b>-hs_thinking_basic_library_viewer</b> 저장소만 선택</li>
+            <li><b>Repository permissions</b> → <b>Contents</b>를 <b>Read and write</b>로 설정 후 생성</li>
+            <li>생성된 토큰(github_pat_…)을 위 칸에 붙여넣고 저장하세요.</li>
+          </ol>
+          <p style="margin-top:8px"><b>토큰이 부담되면:</b> "코드만 복사" 버튼을 눌러 나온 코드를 복사한 뒤, 도와주는 사람(또는 Claude)에게 전달하면 대신 반영해 드릴 수 있습니다.</p>
+        </details>
+        <p class="gf-admin-note">※ 보안: 명단은 소스에 이름이 아닌 해시로 저장됩니다. "전체 교체" 모드에서는 입력한 명단에 없는 기존 학생은 로그인할 수 없게 되니 주의하세요.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  /* ===== 설정 ===== */
+  const ADMIN_KEYWORD = "독선생";
+  const ADMIN_PASS = "01020837265";
+  const APP_SALT = "gfield-thinking-basic-2026-docssam-v2"; // 기존 로그인과 동일
+  const GH_OWNER = "docssam1";
+  const GH_REPO = "-hs_thinking_basic_library_viewer";
+  const GH_PATH = "hs_thinking_basic_library_viewer_v5_spacing_fix.html";
+  // 기존 승인 명단 14명의 해시 (소스에서 그대로 가져옴 — "추가" 모드에서 유지됨)
+  const ORIGINAL_HASHES = ["d02ddaa0589f97c6a773ec08b5a06ec2d25ffc7bd846db86ef3581650996f637","5d1135297fa6890bdf23f8f7bcbab34e22c58e8708bb4ed994dcdf969ffe480d","2ce2d3bc0042052fa1c1dae86e522b5d82aa1ddd12377e3fe27e82f9e6541977","480c1026c9d010257768b1f9df19d8c488a055cebc60bad164cb2e89a0442cc0","6e783beb7d4a01e924f777ad9fcb0e8c76cb2dd71d03923a9427041838031f00","53d9fa9ab6edef4f2d1861a6709cbdc3c9a4a1cb71ffb981f80c2ec176f1c24f","2d963cda02c1f92034e74ac8a3c76541708a734ed1a8b313eed86ef12a7505eb","0f94deeec6bd9f6ed6f0535d4529a8c8e8263668a1a2059b5341369f3da4b6f7","f014d898ff74041cbc4caf46cd3240cb0a2dc23d36062954050da3b4f8085643","b90409d1d5c8a2223681a5033d22e9a9dcd0cf79ba13d5719d337f5ebff49532","01df5f16fac33fcd841cdf030cce05d3697d03604f04629f29335e66375a881b","3ca346b638aeab0436443c4bf5efb5602ac7a0fb2bccab962b1205be8c20bbab","c5c7311fdce8f17e2de402fc5de275e79884cdc68b282d7f9e869592174c5a05","4993332aa541b382e6f6554da970f068e30470ace5ba8886e3f40dd91e36c056"];
+  const APPROVED_RE = /const APPROVED_HASHES=new Set\(\[[^\]]*\]\);/;
+  const LS_TOKEN = "gfield_admin_token";
+  const LS_ROSTER = "gfield_admin_roster";
+
+  let mode = "add"; // "add" | "replace"
+
+  /* ===== 해시 (기존 로그인과 동일한 방식) ===== */
+  function normalizeName(v){return String(v||"").normalize("NFC").replace(/\s+/g,"").trim().toUpperCase();}
+  function displayName(v){return String(v||"").normalize("NFC").replace(/\s+/g,"").trim();}
+  async function sha256Hex(message){
+    const bytes = new TextEncoder().encode(message);
+    const d = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(d)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+  function isAdminKeyword(v){ return displayName(v) === ADMIN_KEYWORD; }
+
+  /* ===== DOM 헬퍼 ===== */
+  const $ = (id)=>document.getElementById(id);
+  function setStatus(el, msg, cls){ el.className = "gf-admin-status " + (cls||""); el.textContent = msg||""; }
+
+  /* ===== 오버레이 열고 닫기 ===== */
+  function openAdmin(){
+    $("gfAdminOverlay").classList.add("show");
+    $("gfAdminLock").style.display = "block";
+    $("gfAdminPanel").style.display = "none";
+    setStatus($("gfAdminLockStatus"), "", "");
+    const p = $("gfAdminPass"); p.value=""; setTimeout(()=>p.focus(),60);
+  }
+  function closeAdmin(){ $("gfAdminOverlay").classList.remove("show"); }
+
+  function showPanel(){
+    $("gfAdminLock").style.display = "none";
+    $("gfAdminPanel").style.display = "block";
+    // 저장된 값 불러오기
+    try{
+      const t = localStorage.getItem(LS_TOKEN); if(t) $("gfAdminToken").value = t;
+      const r = localStorage.getItem(LS_ROSTER); if(r) $("gfAdminRoster").value = r;
+    }catch(e){}
+    setStatus($("gfAdminStatus"), "", "");
+    $("gfAdminCode").style.display = "none";
+  }
+
+  function unlock(){
+    const v = $("gfAdminPass").value.trim();
+    if(v !== ADMIN_PASS){
+      setStatus($("gfAdminLockStatus"), "비밀번호가 올바르지 않습니다.", "err");
+      $("gfAdminPass").select();
+      return;
+    }
+    showPanel();
+  }
+
+  /* ===== 모드 토글 ===== */
+  function setMode(m){
+    mode = m;
+    document.querySelectorAll(".gf-admin-mode").forEach(el=>el.classList.toggle("active", el.dataset.mode===m));
+    $("gfRosterLabel").textContent = (m==="replace")
+      ? "전체 명단 (이 명단만 로그인 가능, 한 줄에 한 명)"
+      : "추가할 학생 이름 (한 줄에 한 명)";
+  }
+
+  /* ===== 이름 → 해시 목록 ===== */
+  function parseNames(text){
+    return String(text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  }
+  async function buildHashes(){
+    const names = parseNames($("gfAdminRoster").value);
+    const set = new Set(mode==="add" ? ORIGINAL_HASHES : []);
+    let count = 0;
+    for(const raw of names){
+      const key = normalizeName(raw);
+      if(!key) continue;
+      set.add(await sha256Hex(APP_SALT + ":" + key));
+      count++;
+    }
+    return { hashes: Array.from(set), added: count };
+  }
+  function buildLine(hashes){
+    return "const APPROVED_HASHES=new Set([" + hashes.map(h=>'"'+h+'"').join(",") + "]);";
+  }
+
+  function rememberLocally(){
+    try{
+      if($("gfAdminRemember").checked){
+        localStorage.setItem(LS_TOKEN, $("gfAdminToken").value.trim());
+        localStorage.setItem(LS_ROSTER, $("gfAdminRoster").value);
+      }else{
+        localStorage.removeItem(LS_TOKEN);
+        localStorage.removeItem(LS_ROSTER);
+      }
+    }catch(e){}
+  }
+
+  /* ===== GitHub 저장 ===== */
+  async function saveToGitHub(){
+    const status = $("gfAdminStatus");
+    const token = $("gfAdminToken").value.trim();
+    if(!token){ setStatus(status, "GitHub 토큰을 입력하거나 '코드만 복사'를 이용하세요.", "err"); return; }
+    const names = parseNames($("gfAdminRoster").value);
+    if(mode==="replace" && names.length===0){ setStatus(status, "전체 교체 모드에서는 최소 1명 이상 입력해야 합니다.", "err"); return; }
+    if(mode==="add" && names.length===0){ setStatus(status, "추가할 학생 이름을 입력하세요.", "err"); return; }
+
+    rememberLocally();
+    setStatus(status, "GitHub에서 파일을 불러오는 중...", "busy");
+    const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}`;
+    const headers = { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" };
+    try{
+      const getRes = await fetch(apiUrl, { headers });
+      if(!getRes.ok){
+        let msg = getRes.status===401 ? "토큰이 유효하지 않습니다(401)." : getRes.status===404 ? "파일/저장소를 찾을 수 없습니다(404). 토큰 권한을 확인하세요." : ("불러오기 실패: " + getRes.status);
+        throw new Error(msg);
+      }
+      const data = await getRes.json();
+      const bytes = Uint8Array.from(atob(String(data.content||"").replace(/\n/g,"")), c=>c.charCodeAt(0));
+      let text = new TextDecoder("utf-8").decode(bytes);
+      if(!APPROVED_RE.test(text)){ throw new Error("APPROVED_HASHES 패턴을 찾지 못했습니다. 파일 구조가 바뀐 것 같습니다."); }
+
+      const { hashes, added } = await buildHashes();
+      const newLine = buildLine(hashes);
+      text = text.replace(APPROVED_RE, ()=>newLine);
+
+      // UTF-8 → base64
+      const enc = new TextEncoder().encode(text);
+      let bin = ""; const CH = 0x8000;
+      for(let i=0;i<enc.length;i+=CH){ bin += String.fromCharCode.apply(null, enc.subarray(i, i+CH)); }
+      const newContent = btoa(bin);
+
+      setStatus(status, "GitHub에 저장하는 중...", "busy");
+      const putRes = await fetch(apiUrl, {
+        method: "PUT",
+        headers: Object.assign({}, headers, { "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          message: `관리자: 승인 명단 수정 (${mode==="replace"?"전체 교체":"추가"} ${added}명)`,
+          content: newContent,
+          sha: data.sha
+        })
+      });
+      if(!putRes.ok){
+        const errTxt = await putRes.text();
+        throw new Error("저장 실패(" + putRes.status + "): " + errTxt.slice(0,160));
+      }
+      setStatus(status, `✓ 저장 완료! 총 ${hashes.length}명 등록 (이번에 ${added}명 처리). 1~2분 뒤 적용되며, 학생은 페이지를 새로고침하면 됩니다.`, "ok");
+    }catch(err){
+      setStatus(status, "오류: " + (err && err.message ? err.message : err), "err");
+    }
+  }
+
+  /* ===== 코드만 복사 ===== */
+  async function copyCode(){
+    const status = $("gfAdminStatus");
+    const names = parseNames($("gfAdminRoster").value);
+    if(names.length===0 && mode==="replace"){ setStatus(status, "최소 1명 이상 입력하세요.", "err"); return; }
+    rememberLocally();
+    try{
+      const { hashes } = await buildHashes();
+      const line = buildLine(hashes);
+      const box = $("gfAdminCode");
+      box.value = line;
+      box.style.display = "block";
+      try{ await navigator.clipboard.writeText(line); setStatus(status, `✓ 코드 복사됨 (총 ${hashes.length}명). 아래 코드를 전달하거나 파일의 APPROVED_HASHES 줄과 교체하세요.`, "ok"); }
+      catch(e){ box.select(); setStatus(status, "아래 코드를 직접 선택해 복사하세요.", "ok"); }
+    }catch(err){
+      setStatus(status, "오류: " + (err && err.message ? err.message : err), "err");
+    }
+  }
+
+  /* ===== 버튼 연결 ===== */
+  function bindUI(){
+    $("gfAdminUnlockBtn").addEventListener("click", unlock);
+    $("gfAdminPass").addEventListener("keydown", e=>{ if(e.key==="Enter") unlock(); });
+    $("gfAdminLockClose").addEventListener("click", closeAdmin);
+    $("gfAdminCloseBtn").addEventListener("click", closeAdmin);
+    $("gfAdminSaveBtn").addEventListener("click", saveToGitHub);
+    $("gfAdminCopyBtn").addEventListener("click", copyCode);
+    document.querySelectorAll(".gf-admin-mode").forEach(el=>el.addEventListener("click", ()=>setMode(el.dataset.mode)));
+    $("gfAdminOverlay").addEventListener("click", e=>{ if(e.target===$("gfAdminOverlay")) closeAdmin(); });
+    document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("gfAdminOverlay").classList.contains("show")) closeAdmin(); });
+  }
+
+  /* ===== 로그인 화면(iframe) 가로채기 ===== */
+  function hookGate(){
+    const doc = lessonViewer.contentDocument;
+    if(!doc || doc.documentElement.dataset.gfAdminBound) return;
+    doc.documentElement.dataset.gfAdminBound = "1";
+    // 입장 버튼 클릭 가로채기 (캡처 단계에서 inline onclick보다 먼저 실행)
+    doc.addEventListener("click", (e)=>{
+      const btn = e.target.closest && e.target.closest(".gate-button");
+      if(!btn) return;
+      const input = doc.getElementById("studentNameInput");
+      if(input && isAdminKeyword(input.value)){
+        e.preventDefault(); e.stopImmediatePropagation();
+        openAdmin();
+      }
+    }, true);
+    // Enter 가로채기
+    doc.addEventListener("keydown", (e)=>{
+      if(e.key!=="Enter") return;
+      const t = e.target;
+      if(t && t.id==="studentNameInput" && isAdminKeyword(t.value)){
+        e.preventDefault(); e.stopImmediatePropagation();
+        openAdmin();
+      }
+    }, true);
+  }
+
+  lessonViewer.addEventListener("load", hookGate);
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    bindUI();
+    setMode("add");
+    // iframe이 이미 로드된 경우 대비
+    try{ if(lessonViewer.contentDocument && lessonViewer.contentDocument.readyState!=="loading") hookGate(); }catch(e){}
+  });
+})();
 </script>
 </body>
 </html>
