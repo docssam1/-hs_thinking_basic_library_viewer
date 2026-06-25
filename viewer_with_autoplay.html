@@ -203,7 +203,7 @@ lessonViewer.addEventListener('load', () => {
 <!-- ============================================================
      관리자(독선생) 모드 — 명단 관리
      로그인 화면에서 "독선생" 입력 후 입장하면 비밀번호를 묻고,
-     맞으면 명단을 추가/교체하여 GitHub에 바로 반영할 수 있습니다.
+     맞으면 명단을 추가/삭제/교체하여 GitHub에 바로 반영할 수 있습니다.
      ============================================================ -->
 <div id="gfAdminOverlay">
   <div class="gf-admin-card">
@@ -227,8 +227,9 @@ lessonViewer.addEventListener('load', () => {
         <p class="gf-admin-desc">학생 이름을 한 줄에 한 명씩 입력하세요. 저장하면 모든 학생 기기에 적용됩니다. (반영까지 최대 1~2분, 학생은 새로고침 필요)</p>
 
         <div class="gf-admin-modes">
-          <div class="gf-admin-mode active" data-mode="add">기존 명단 유지<br>+ 추가</div>
-          <div class="gf-admin-mode" data-mode="replace">입력한 명단으로<br>전체 교체</div>
+          <div class="gf-admin-mode active" data-mode="add">추가</div>
+          <div class="gf-admin-mode" data-mode="remove">삭제</div>
+          <div class="gf-admin-mode" data-mode="replace">전체 교체</div>
         </div>
 
         <label class="gf-admin-label" id="gfRosterLabel" for="gfAdminRoster">추가할 학생 이름 (한 줄에 한 명)</label>
@@ -258,7 +259,7 @@ lessonViewer.addEventListener('load', () => {
           </ol>
           <p style="margin-top:8px"><b>토큰이 부담되면:</b> "코드만 복사" 버튼을 눌러 나온 코드를 복사한 뒤, 도와주는 사람(또는 Claude)에게 전달하면 대신 반영해 드릴 수 있습니다.</p>
         </details>
-        <p class="gf-admin-note">※ 보안: 명단은 소스에 이름이 아닌 해시로 저장됩니다. "전체 교체" 모드에서는 입력한 명단에 없는 기존 학생은 로그인할 수 없게 되니 주의하세요.</p>
+        <p class="gf-admin-note">※ <b>추가</b>: 입력한 이름을 명단에 더합니다. <b>삭제</b>: 입력한 이름(정확히 일치)을 명단에서 뺍니다 — 기존 학생도 이름만 알면 삭제 가능. <b>전체 교체</b>: 입력한 명단만 남기고 나머지는 모두 제외됩니다. 명단은 소스에 이름이 아닌 해시로 저장됩니다.</p>
       </div>
     </div>
   </div>
@@ -274,13 +275,13 @@ lessonViewer.addEventListener('load', () => {
   const GH_OWNER = "docssam1";
   const GH_REPO = "-hs_thinking_basic_library_viewer";
   const GH_PATH = "hs_thinking_basic_library_viewer_v5_spacing_fix.html";
-  // 기존 승인 명단 14명의 해시 (소스에서 그대로 가져옴 — "추가" 모드에서 유지됨)
+  // 기존 승인 명단 14명의 해시 (소스에서 그대로 가져옴 — 토큰 없이 복사할 때 기준값)
   const ORIGINAL_HASHES = ["d02ddaa0589f97c6a773ec08b5a06ec2d25ffc7bd846db86ef3581650996f637","5d1135297fa6890bdf23f8f7bcbab34e22c58e8708bb4ed994dcdf969ffe480d","2ce2d3bc0042052fa1c1dae86e522b5d82aa1ddd12377e3fe27e82f9e6541977","480c1026c9d010257768b1f9df19d8c488a055cebc60bad164cb2e89a0442cc0","6e783beb7d4a01e924f777ad9fcb0e8c76cb2dd71d03923a9427041838031f00","53d9fa9ab6edef4f2d1861a6709cbdc3c9a4a1cb71ffb981f80c2ec176f1c24f","2d963cda02c1f92034e74ac8a3c76541708a734ed1a8b313eed86ef12a7505eb","0f94deeec6bd9f6ed6f0535d4529a8c8e8263668a1a2059b5341369f3da4b6f7","f014d898ff74041cbc4caf46cd3240cb0a2dc23d36062954050da3b4f8085643","b90409d1d5c8a2223681a5033d22e9a9dcd0cf79ba13d5719d337f5ebff49532","01df5f16fac33fcd841cdf030cce05d3697d03604f04629f29335e66375a881b","3ca346b638aeab0436443c4bf5efb5602ac7a0fb2bccab962b1205be8c20bbab","c5c7311fdce8f17e2de402fc5de275e79884cdc68b282d7f9e869592174c5a05","4993332aa541b382e6f6554da970f068e30470ace5ba8886e3f40dd91e36c056"];
   const APPROVED_RE = /const APPROVED_HASHES=new Set\(\[[^\]]*\]\);/;
   const LS_TOKEN = "gfield_admin_token";
   const LS_ROSTER = "gfield_admin_roster";
 
-  let mode = "add"; // "add" | "replace"
+  let mode = "add"; // "add" | "remove" | "replace"
 
   /* ===== 해시 (기존 로그인과 동일한 방식) ===== */
   function normalizeName(v){return String(v||"").normalize("NFC").replace(/\s+/g,"").trim().toUpperCase();}
@@ -332,26 +333,39 @@ lessonViewer.addEventListener('load', () => {
   function setMode(m){
     mode = m;
     document.querySelectorAll(".gf-admin-mode").forEach(el=>el.classList.toggle("active", el.dataset.mode===m));
-    $("gfRosterLabel").textContent = (m==="replace")
-      ? "전체 명단 (이 명단만 로그인 가능, 한 줄에 한 명)"
-      : "추가할 학생 이름 (한 줄에 한 명)";
+    const labels = {
+      add: "추가할 학생 이름 (한 줄에 한 명)",
+      remove: "삭제할 학생 이름 (이름이 정확해야 삭제됩니다, 한 줄에 한 명)",
+      replace: "전체 명단 (이 명단만 로그인 가능, 한 줄에 한 명)"
+    };
+    $("gfRosterLabel").textContent = labels[m] || labels.add;
   }
 
   /* ===== 이름 → 해시 목록 ===== */
   function parseNames(text){
     return String(text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   }
-  async function buildHashes(){
-    const names = parseNames($("gfAdminRoster").value);
-    const set = new Set(mode==="add" ? ORIGINAL_HASHES : []);
-    let count = 0;
+  // 입력한 이름들을 해시 배열로
+  async function computeEntered(names){
+    const out = [];
     for(const raw of names){
       const key = normalizeName(raw);
       if(!key) continue;
-      set.add(await sha256Hex(APP_SALT + ":" + key));
-      count++;
+      out.push(await sha256Hex(APP_SALT + ":" + key));
     }
-    return { hashes: Array.from(set), added: count };
+    return out;
+  }
+  // 파일 텍스트에서 현재 APPROVED_HASHES 목록 추출
+  function extractHashes(text){
+    const m = text.match(APPROVED_RE);
+    if(!m) return [];
+    return (m[0].match(/[0-9a-f]{64}/g) || []);
+  }
+  // 현재 명단(base)에 모드별 연산 적용
+  function applyMode(base, entered){
+    if(mode==="replace") return Array.from(new Set(entered));
+    if(mode==="remove"){ const rm=new Set(entered); return base.filter(h=>!rm.has(h)); }
+    const s=new Set(base); entered.forEach(h=>s.add(h)); return Array.from(s);
   }
   function buildLine(hashes){
     return "const APPROVED_HASHES=new Set([" + hashes.map(h=>'"'+h+'"').join(",") + "]);";
@@ -375,8 +389,10 @@ lessonViewer.addEventListener('load', () => {
     const token = $("gfAdminToken").value.trim();
     if(!token){ setStatus(status, "GitHub 토큰을 입력하거나 '코드만 복사'를 이용하세요.", "err"); return; }
     const names = parseNames($("gfAdminRoster").value);
-    if(mode==="replace" && names.length===0){ setStatus(status, "전체 교체 모드에서는 최소 1명 이상 입력해야 합니다.", "err"); return; }
-    if(mode==="add" && names.length===0){ setStatus(status, "추가할 학생 이름을 입력하세요.", "err"); return; }
+    if(names.length===0){
+      const msg = mode==="remove" ? "삭제할 학생 이름을 입력하세요." : mode==="replace" ? "전체 교체 모드에서는 최소 1명 이상 입력해야 합니다." : "추가할 학생 이름을 입력하세요.";
+      setStatus(status, msg, "err"); return;
+    }
 
     rememberLocally();
     setStatus(status, "GitHub에서 파일을 불러오는 중...", "busy");
@@ -393,7 +409,9 @@ lessonViewer.addEventListener('load', () => {
       let text = new TextDecoder("utf-8").decode(bytes);
       if(!APPROVED_RE.test(text)){ throw new Error("APPROVED_HASHES 패턴을 찾지 못했습니다. 파일 구조가 바뀐 것 같습니다."); }
 
-      const { hashes, added } = await buildHashes();
+      const current = extractHashes(text);
+      const entered = await computeEntered(names);
+      const hashes = applyMode(current, entered);
       const newLine = buildLine(hashes);
       text = text.replace(APPROVED_RE, ()=>newLine);
 
@@ -403,12 +421,14 @@ lessonViewer.addEventListener('load', () => {
       for(let i=0;i<enc.length;i+=CH){ bin += String.fromCharCode.apply(null, enc.subarray(i, i+CH)); }
       const newContent = btoa(bin);
 
+      const modeLabel = mode==="replace" ? "전체 교체" : mode==="remove" ? "삭제" : "추가";
+      const removedCount = current.length - hashes.length;
       setStatus(status, "GitHub에 저장하는 중...", "busy");
       const putRes = await fetch(apiUrl, {
         method: "PUT",
         headers: Object.assign({}, headers, { "Content-Type": "application/json" }),
         body: JSON.stringify({
-          message: `관리자: 승인 명단 수정 (${mode==="replace"?"전체 교체":"추가"} ${added}명)`,
+          message: `관리자: 승인 명단 수정 (${modeLabel} ${entered.length}명 입력)`,
           content: newContent,
           sha: data.sha
         })
@@ -417,7 +437,11 @@ lessonViewer.addEventListener('load', () => {
         const errTxt = await putRes.text();
         throw new Error("저장 실패(" + putRes.status + "): " + errTxt.slice(0,160));
       }
-      setStatus(status, `✓ 저장 완료! 총 ${hashes.length}명 등록 (이번에 ${added}명 처리). 1~2분 뒤 적용되며, 학생은 페이지를 새로고침하면 됩니다.`, "ok");
+      let detail;
+      if(mode==="remove") detail = (removedCount>0 ? `${removedCount}명 삭제됨` : "삭제된 학생 없음(이름 불일치 확인)");
+      else if(mode==="replace") detail = `전체 ${hashes.length}명으로 교체`;
+      else detail = `이번에 ${entered.length}명 추가 시도`;
+      setStatus(status, `✓ 저장 완료! 현재 총 ${hashes.length}명 (${detail}). 1~2분 뒤 적용되며, 학생은 페이지를 새로고침하면 됩니다.`, "ok");
     }catch(err){
       setStatus(status, "오류: " + (err && err.message ? err.message : err), "err");
     }
@@ -427,10 +451,12 @@ lessonViewer.addEventListener('load', () => {
   async function copyCode(){
     const status = $("gfAdminStatus");
     const names = parseNames($("gfAdminRoster").value);
-    if(names.length===0 && mode==="replace"){ setStatus(status, "최소 1명 이상 입력하세요.", "err"); return; }
+    if(names.length===0){ setStatus(status, "이름을 최소 1명 이상 입력하세요.", "err"); return; }
     rememberLocally();
     try{
-      const { hashes } = await buildHashes();
+      // 토큰 없이 복사할 때는 기존 14명(ORIGINAL_HASHES)을 기준으로 계산합니다.
+      const entered = await computeEntered(names);
+      const hashes = applyMode(ORIGINAL_HASHES, entered);
       const line = buildLine(hashes);
       const box = $("gfAdminCode");
       box.value = line;
